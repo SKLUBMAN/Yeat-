@@ -61,5 +61,125 @@
       font-weight: 600;
       border: 1px solid var(--border);
     }
-    .card a:hover { border-color: var(--accent
+    .card a:hover { border-color: var(--accent); color: var(--accent); }
+
+    table { width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 8px; overflow: hidden; font-size: 0.85rem; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #1a1a20; color: var(--accent); font-weight: 700; }
+    tr:hover { background: #181820; }
     
+    .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>YEAT TRACKER</h1>
+    <p class="subtitle">AUTOMATED LEAKS, SOCIAL MEDIA & ARTIST TRACKER</p>
+  </header>
+
+  <nav>
+    <button class="tab-btn active" onclick="switchTab('surfaced')">Recently Surfaced</button>
+    <button class="tab-btn" onclick="switchTab('socials')">Socials</button>
+    <button class="tab-btn" onclick="switchTab('sheet')">Artist Tracker</button>
+  </nav>
+
+  <!-- Recently Surfaced Section -->
+  <div id="surfaced" class="section-content active">
+    <div id="surfaced-container" class="grid"><div class="loading">Loading leaks...</div></div>
+  </div>
+
+  <!-- Socials Section -->
+  <div id="socials" class="section-content">
+    <div id="socials-container" class="grid"><div class="loading">Loading social posts...</div></div>
+  </div>
+
+  <!-- Google Sheet Section -->
+  <div id="sheet" class="section-content">
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr id="sheet-header"></tr>
+        </thead>
+        <tbody id="sheet-body">
+          <tr><td colspan="5" class="loading">Loading Google Sheet data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.section-content').forEach(sec => sec.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    // Load Recently Surfaced
+    fetch('./data/recently_surfaced.json')
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('surfaced-container');
+        if (!data || data.length === 0) {
+          container.innerHTML = '<p class="loading">No leaked items found currently.</p>';
+          return;
+        }
+        container.innerHTML = data.map(item => `
+          <div class="card">
+            <div>
+              <h3>${item.title || 'Untitled Leak'}</h3>
+              <p>Surfaced: ${item.date_surfaced ? new Date(item.date_surfaced).toLocaleDateString() : 'N/A'}</p>
+            </div>
+            <a href="${item.url}" target="_blank">View on Leaked.cx</a>
+          </div>
+        `).join('');
+      }).catch(() => {
+        document.getElementById('surfaced-container').innerHTML = '<p class="loading">Failed to load leaks.</p>';
+      });
+
+    // Load Social Posts
+    fetch('./data/social_posts.json')
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('socials-container');
+        if (!data || data.length === 0) {
+          container.innerHTML = '<p class="loading">No recent social posts found.</p>';
+          return;
+        }
+        container.innerHTML = data.map(post => `
+          <div class="card">
+            <div>
+              <h3>${post.title}</h3>
+              <p>Published: ${new Date(post.published_at).toLocaleDateString()}</p>
+            </div>
+            <a href="${post.url}" target="_blank">Watch on ${post.platform}</a>
+          </div>
+        `).join('');
+      }).catch(() => {
+        document.getElementById('socials-container').innerHTML = '<p class="loading">Failed to load social posts.</p>';
+      });
+
+    // Load Google Sheet Tracker
+    fetch('./data/google_sheet_tracker.json')
+      .then(res => res.json())
+      .then(data => {
+        if (!data || data.length === 0) return;
+        
+        const keys = Object.keys(data[0]).slice(0, 5); // display first 5 columns
+        document.getElementById('sheet-header').innerHTML = keys.map(k => `<th>${k}</th>`).join('');
+
+        const tbody = document.getElementById('sheet-body');
+        tbody.innerHTML = data.slice(0, 50).map(row => `
+          <tr>
+            ${keys.map(k => `<td>${row[k] || '-'}</td>`).join('')}
+          </tr>
+        `).join('');
+      }).catch(() => {
+        document.getElementById('sheet-body').innerHTML = '<tr><td colspan="5" class="loading">Failed to load tracker data.</td></tr>';
+      });
+  </script>
+
+</body>
+</html>
