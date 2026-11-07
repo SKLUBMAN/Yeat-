@@ -17,11 +17,11 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: var(--bg); color: var(--text); padding: 20px; max-width: 1200px; margin: 0 auto; }
     
-    header { text-align: center; padding: 30px 0; border-bottom: 1px solid var(--border); }
+    header { text-align: center; padding: 25px 0 15px; border-bottom: 1px solid var(--border); }
     h1 { font-size: 2rem; font-weight: 800; letter-spacing: 2px; color: var(--accent); }
-    p.subtitle { color: var(--text-muted); margin-top: 5px; font-size: 0.9rem; }
+    p.subtitle { color: var(--text-muted); margin-top: 5px; font-size: 0.85rem; }
 
-    nav { display: flex; justify-content: center; gap: 10px; margin: 25px 0; }
+    nav { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
     .tab-btn {
       background: var(--card-bg);
       border: 1px solid var(--border);
@@ -36,6 +36,23 @@
 
     .section-content { display: none; }
     .section-content.active { display: block; }
+
+    /* Category Buttons & Sub-pills */
+    .filter-group { margin-bottom: 15px; }
+    .filter-title { font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; font-weight: 700; }
+    .pill-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+    .pill {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-weight: 500;
+      transition: 0.2s;
+    }
+    .pill.active, .pill:hover { background: #252530; border-color: var(--accent); color: var(--accent); }
 
     .search-bar { width: 100%; padding: 12px; margin-bottom: 15px; background: var(--card-bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; font-size: 0.9rem; }
 
@@ -88,14 +105,35 @@
 
   <!-- Google Sheet Section -->
   <div id="sheet" class="section-content active">
-    <input type="text" id="searchInput" class="search-bar" placeholder="Search songs, eras, leaks..." onkeyup="filterTable()">
-    <div style="overflow-x:auto; max-height: 70vh;">
+    
+    <!-- Category Selector -->
+    <div class="filter-group">
+      <div class="filter-title">Category / Sheet</div>
+      <div id="category-pills" class="pill-container"></div>
+    </div>
+
+    <!-- Era Selector -->
+    <div class="filter-group">
+      <div class="filter-title">Filter by Era</div>
+      <div id="era-pills" class="pill-container"></div>
+    </div>
+
+    <input type="text" id="searchInput" class="search-bar" placeholder="Search track name, notes, quality..." onkeyup="filterTable()">
+
+    <div style="overflow-x:auto; max-height: 60vh;">
       <table>
         <thead>
-          <tr id="sheet-header"></tr>
+          <tr>
+            <th>Era</th>
+            <th>Track Name</th>
+            <th>Type</th>
+            <th>Quality</th>
+            <th>Leak Date</th>
+            <th>Link / Notes</th>
+          </tr>
         </thead>
         <tbody id="sheet-body">
-          <tr><td colspan="6" class="loading">Loading Google Sheet database...</td></tr>
+          <tr><td colspan="6" class="loading">Loading Google Sheet data...</td></tr>
         </tbody>
       </table>
     </div>
@@ -108,16 +146,17 @@
 
   <!-- Socials Section -->
   <div id="socials" class="section-content">
-    <div id="socials-container" class="grid"><div class="loading">Loading YouTube uploads...</div></div>
+    <div id="socials-container" class="grid"><div class="loading">Loading social updates...</div></div>
   </div>
 
   <script>
     let sheetData = [];
+    let selectedCategory = "ALL";
+    let selectedEra = "ALL";
 
     function switchTab(tabId) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.section-content').forEach(sec => sec.classList.remove('active'));
-      
       event.target.classList.add('active');
       document.getElementById(tabId).classList.add('active');
     }
@@ -130,46 +169,97 @@
         document.getElementById('song-count').textContent = data.length;
         if (!data || data.length === 0) return;
         
-        const keys = ["Era", "Name", "Type", "Quality", "Leak Date", "SheetSource"];
-        document.getElementById('sheet-header').innerHTML = keys.map(k => `<th>${k}</th>`).join('');
-        renderTable(sheetData);
+        buildFilters();
+        renderTable();
       }).catch(() => {
         document.getElementById('sheet-body').innerHTML = '<tr><td colspan="6" class="loading">Failed to load tracker data.</td></tr>';
       });
 
-    function renderTable(data) {
-      const tbody = document.getElementById('sheet-body');
-      if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="loading">No matching songs found.</td></tr>';
-        return;
+    function buildFilters() {
+      // Build Category Pills
+      const categories = ["ALL", ...new Set(sheetData.map(d => d.Category).filter(Boolean))];
+      const catContainer = document.getElementById('category-pills');
+      catContainer.innerHTML = categories.map(cat => `
+        <button class="pill ${cat === 'ALL' ? 'active' : ''}" onclick="selectCategory('${cat}', this)">${cat}</button>
+      `).join('');
+
+      buildEraPills();
+    }
+
+    function buildEraPills() {
+      let filtered = sheetData;
+      if (selectedCategory !== "ALL") {
+        filtered = sheetData.filter(d => d.Category === selectedCategory);
       }
-      tbody.innerHTML = data.map(row => `
-        <tr>
-          <td>${row["Era"] || '-'}</td>
-          <td>${row["Name"] || '-'}</td>
-          <td>${row["Type"] || '-'}</td>
-          <td>${row["Quality"] || '-'}</td>
-          <td>${row["Leak Date"] || row["Date"] || '-'}</td>
-          <td>${row["SheetSource"] || '-'}</td>
-        </tr>
+      const eras = ["ALL", ...new Set(filtered.map(d => d.Era).filter(Boolean))];
+      const eraContainer = document.getElementById('era-pills');
+      eraContainer.innerHTML = eras.map(era => `
+        <button class="pill ${era === selectedEra ? 'active' : ''}" onclick="selectEra('${era}', this)">${era}</button>
       `).join('');
     }
 
-    function filterTable() {
-      const query = document.getElementById('searchInput').value.toLowerCase();
-      const filtered = sheetData.filter(row => {
-        return Object.values(row).some(val => String(val).toLowerCase().includes(query));
-      });
-      renderTable(filtered);
+    function selectCategory(cat, btn) {
+      selectedCategory = cat;
+      selectedEra = "ALL";
+      document.querySelectorAll('#category-pills .pill').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      buildEraPills();
+      renderTable();
     }
 
-    // Load Recently Surfaced
+    function selectEra(era, btn) {
+      selectedEra = era;
+      document.querySelectorAll('#era-pills .pill').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      renderTable();
+    }
+
+    function renderTable() {
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      
+      let filtered = sheetData.filter(row => {
+        const matchesCat = selectedCategory === "ALL" || row.Category === selectedCategory;
+        const matchesEra = selectedEra === "ALL" || row.Era === selectedEra;
+        const matchesSearch = !query || Object.values(row).some(val => String(val).toLowerCase().includes(query));
+        return matchesCat && matchesEra && matchesSearch;
+      });
+
+      const tbody = document.getElementById('sheet-body');
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">No matching tracks found in this category.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.slice(0, 250).map(row => {
+        const link = row["Link(s)"] || row["Link"] || "";
+        const linkHtml = link.startsWith("http") 
+          ? `<a href="${link}" target="_blank" style="color:var(--accent);">Listen / Link</a>` 
+          : (row["Notes"] || row["Note"] || "-");
+
+        return `
+          <tr>
+            <td><strong>${row["Era"] || '-'}</strong></td>
+            <td>${row["Name"] || '-'}</td>
+            <td>${row["Type"] || '-'}</td>
+            <td>${row["Quality"] || '-'}</td>
+            <td>${row["Leak Date"] || row["Date"] || '-'}</td>
+            <td>${linkHtml}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterTable() {
+      renderTable();
+    }
+
+    // Load Recently Surfaced Leaks
     fetch('data/recently_surfaced.json')
       .then(res => res.json())
       .then(data => {
         const container = document.getElementById('surfaced-container');
         if (!data || data.length === 0) {
-          container.innerHTML = '<p class="loading">No recent leaks found currently.</p>';
+          container.innerHTML = '<p class="loading">No recent leaks found.</p>';
           return;
         }
         container.innerHTML = data.map(item => `
@@ -189,7 +279,7 @@
       .then(data => {
         const container = document.getElementById('socials-container');
         if (!data || data.length === 0) {
-          container.innerHTML = '<p class="loading">No recent YouTube uploads found.</p>';
+          container.innerHTML = '<p class="loading">No recent updates found.</p>';
           return;
         }
         container.innerHTML = data.map(post => `
