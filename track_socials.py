@@ -3,7 +3,8 @@ import json
 import requests
 
 API_KEY = os.environ.get("YOUTUBE_API_KEY")
-YEAT_CHANNEL_ID = "UCV4UK9LNNLViFP4qZA_Wmfw"
+# Yeat's official Uploads Playlist ID
+UPLOADS_PLAYLIST_ID = "UUV4UK9LNNLViFP4qZA_Wmfw"
 
 def fetch_youtube_posts():
     if not API_KEY:
@@ -11,8 +12,8 @@ def fetch_youtube_posts():
         return []
 
     url = (
-        f"https://www.googleapis.com/youtube/v3/search?"
-        f"key={API_KEY}&channelId={YEAT_CHANNEL_ID}&part=snippet,id&order=date&maxResults=10"
+        f"https://www.googleapis.com/youtube/v3/playlistItems?"
+        f"key={API_KEY}&playlistId={UPLOADS_PLAYLIST_ID}&part=snippet&maxResults=25"
     )
     
     response = requests.get(url)
@@ -25,14 +26,18 @@ def fetch_youtube_posts():
     posts = []
     
     for item in data.get("items", []):
-        if item.get("id", {}).get("kind") == "youtube#video":
+        snippet = item.get("snippet", {})
+        resource_id = snippet.get("resourceId", {})
+        video_id = resource_id.get("videoId")
+        
+        if video_id:
             posts.append({
                 "platform": "YouTube",
-                "title": item["snippet"]["title"],
-                "video_id": item["id"]["videoId"],
-                "url": f"https://www.youtube.com/watch?v={item['id']['videoId']}",
-                "published_at": item["snippet"]["publishedAt"],
-                "thumbnail": item["snippet"]["thumbnails"]["high"]["url"]
+                "title": snippet.get("title", "Untitled Upload"),
+                "video_id": video_id,
+                "url": f"https://www.youtube.com/watch?v={video_id}",
+                "published_at": snippet.get("publishedAt", ""),
+                "thumbnail": snippet.get("thumbnails", {}).get("high", {}).get("url", "")
             })
             
     return posts
@@ -48,4 +53,3 @@ def save_social_data(data):
 if __name__ == "__main__":
     posts = fetch_youtube_posts()
     save_social_data(posts)
-  
