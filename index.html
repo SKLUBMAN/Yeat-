@@ -81,7 +81,7 @@
   </header>
 
   <nav>
-    <button class="tab-btn active" onclick="switchTab('sheet')">Artist Tracker</button>
+    <button class="tab-btn active" onclick="switchTab('sheet')">Artist Tracker (<span id="song-count">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('surfaced')">Recently Surfaced</button>
     <button class="tab-btn" onclick="switchTab('socials')">Socials</button>
   </nav>
@@ -89,13 +89,13 @@
   <!-- Google Sheet Section -->
   <div id="sheet" class="section-content active">
     <input type="text" id="searchInput" class="search-bar" placeholder="Search songs, eras, leaks..." onkeyup="filterTable()">
-    <div style="overflow-x:auto; max-height: 600px;">
+    <div style="overflow-x:auto; max-height: 70vh;">
       <table>
         <thead>
           <tr id="sheet-header"></tr>
         </thead>
         <tbody id="sheet-body">
-          <tr><td colspan="5" class="loading">Loading Google Sheet data...</td></tr>
+          <tr><td colspan="6" class="loading">Loading Google Sheet database...</td></tr>
         </tbody>
       </table>
     </div>
@@ -108,7 +108,7 @@
 
   <!-- Socials Section -->
   <div id="socials" class="section-content">
-    <div id="socials-container" class="grid"><div class="loading">Loading social posts...</div></div>
+    <div id="socials-container" class="grid"><div class="loading">Loading YouTube uploads...</div></div>
   </div>
 
   <script>
@@ -127,13 +127,14 @@
       .then(res => res.json())
       .then(data => {
         sheetData = data;
+        document.getElementById('song-count').textContent = data.length;
         if (!data || data.length === 0) return;
         
         const keys = ["Era", "Name", "Type", "Quality", "Leak Date", "SheetSource"];
         document.getElementById('sheet-header').innerHTML = keys.map(k => `<th>${k}</th>`).join('');
         renderTable(sheetData);
       }).catch(() => {
-        document.getElementById('sheet-body').innerHTML = '<tr><td colspan="5" class="loading">Failed to load tracker data.</td></tr>';
+        document.getElementById('sheet-body').innerHTML = '<tr><td colspan="6" class="loading">Failed to load tracker data.</td></tr>';
       });
 
     function renderTable(data) {
@@ -142,7 +143,7 @@
         tbody.innerHTML = '<tr><td colspan="6" class="loading">No matching songs found.</td></tr>';
         return;
       }
-      tbody.innerHTML = data.slice(0, 300).map(row => `
+      tbody.innerHTML = data.map(row => `
         <tr>
           <td>${row["Era"] || '-'}</td>
           <td>${row["Name"] || '-'}</td>
@@ -168,7 +169,7 @@
       .then(data => {
         const container = document.getElementById('surfaced-container');
         if (!data || data.length === 0) {
-          container.innerHTML = '<p class="loading">No recent leaks found.</p>';
+          container.innerHTML = '<p class="loading">No recent leaks found currently.</p>';
           return;
         }
         container.innerHTML = data.map(item => `
@@ -188,16 +189,16 @@
       .then(data => {
         const container = document.getElementById('socials-container');
         if (!data || data.length === 0) {
-          container.innerHTML = '<p class="loading">No recent social posts found.</p>';
+          container.innerHTML = '<p class="loading">No recent YouTube uploads found.</p>';
           return;
         }
         container.innerHTML = data.map(post => `
           <div class="card">
             <div>
               <h3>${post.title}</h3>
-              <p>Published: ${new Date(post.published_at).toLocaleDateString()}</p>
+              <p>Published: ${post.published_at ? new Date(post.published_at).toLocaleDateString() : 'N/A'}</p>
             </div>
-            <a href="${post.url}" target="_blank">Watch on ${post.platform}</a>
+            <a href="${post.url}" target="_blank">Watch on YouTube</a>
           </div>
         `).join('');
       });
